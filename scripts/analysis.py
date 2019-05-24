@@ -1,13 +1,16 @@
+##common imports
 import numpy as np
 import matplotlib.pyplot as plt
-
-from skimage import io, morphology, measure
-from skimage.exposure import histogram
-from scipy import ndimage as ndi
-from skimage.filters import sobel
 import glob
 import json
 
+##image analysis imports
+from scipy import ndimage as ndi
+from skimage import io, morphology, measure
+from skimage.exposure import histogram
+from skimage.filters import sobel
+
+##machine learning imports
 from sklearn.cluster import KMeans
 from sklearn.svm import SVC, LinearSVC
 from sklearn.model_selection import cross_val_score,ShuffleSplit
@@ -17,16 +20,14 @@ from sklearn.metrics import confusion_matrix
 def doAll():
     with open('../data/day_classes.json') as f_in:
         day_classes=json.load(f_in)
+        
     ref_im=loadImage(2019,5,5)
     bound=getOceanBoundary(ref_im)
     cols={'good':'dodgerblue','okay':'forestgreen','bad':'firebrick'}
     plt.figure()
-    scats=[]
-    cs=[]
-    class_=[]
+    full_features, class_ = [], []
     for im in glob.glob('../data/*.png'):
         ID = im[im.rfind('/')+1:-4]
-        
             
         image= io.imread(im)
         min_y = min(ref_im.shape[1], image.shape[1])
@@ -35,24 +36,23 @@ def doAll():
         new_bound[:min_x, :min_y] = bound[:min_x,:min_y]
 
         MI = maskImage(image[:min_x,:min_y],new_bound).astype(float)
-        MI[MI==0]=np.nan
-        
-        
+        MI[MI==0]=np.nan      
         
         features=[]
-        for i in (0,1,2):
+        RGB_channels=range(3)
+        for i in RGB_channels:
             features.extend([np.nanmedian(MI[...,i]),np.nanvar(MI[...,i])])
             h,hc=getGreyscaleHistogram(maskImage(image[:min_x,:min_y],new_bound),i)
             plt.plot(hc,h,c=cols[day_classes[ID]])
             
-        scats.append(features)
-        cs.append(cols[day_classes[ID]])
+        full_features.append(features)
         class_.append(day_classes[ID])
     
-    #plt.legend()
-    na= np.array(scats)
-    f,ax=plt.subplots()
-    ax.scatter(*na[...,4:].T,c=cs,marker='o',s=80,zorder=100)
+    na = np.array(full_features)
+    f, ax = plt.subplots()
+    
+    ax.scatter(*na[...,4:].T,c=[cols[cl_] for cl_ in class_],marker='o',s=80,zorder=100)
+    
     MLAL(na,class_,ax)
     print('Mean accuracy {:.3f} ± {:.4f}'.format(*MLSVM(na[...,:],class_,ax)))
     
@@ -61,8 +61,7 @@ def doAll():
 
 
 def MLSVM(data,classes,ax):
-    #classes=np.array([c if c!='okay' else 'good' for c in classes])
-    classes=np.array([1 if c!='bad' else 0 for c in classes])
+    classes = np.array([1 if c != 'bad' else 0 for c in classes])
     scaler = StandardScaler()
     scaler.fit(data)
 
@@ -89,15 +88,25 @@ def MLAL(data,classes,ax):
         my_members = k_means_labels == k
         cluster_center = k_means_cluster_centers[k]
         plt.plot(data[my_members, 4], data[my_members, 5], 'w', markerfacecolor=None,mec='darkgrey', marker=col,markersize=20,markeredgewidth=3)
-    #ref_classes={K:k_means_labels[list(classes).index(K)] for K in ('good','okay','bad')}
-    norm_class=classes #[ref_classes[i] for i in classes]
+    relabel=False
+    if relabel:
+        ref_classes={K:k_means_labels[list(classes).index(K)] for K in ('good','okay','bad')}
+        norm_class=[ref_classes[i] for i in classes]
+    else:
+        norm_class=classes
     print(confusion_matrix(norm_class, k_means_labels))
     
         
 def loadImage(year,month,day):
     return io.imread('../data/{}_{:02d}_{:02d}.png'.format(year,month,day))
 
-def getGreyscaleHistogram(image_full,axis=2):
+def maskImage(image, boundary):
+    new_image = image.copy()
+    for i in range(4):
+        new_image[...,i] *= boundary
+    return new_image
+
+def getGreyscaleHistogram(image_full,axis=2,plot_it=False):
     image = image_full[...,axis]
     hist, hist_centers = histogram(image,normalize=1)
 
@@ -105,16 +114,17 @@ def getGreyscaleHistogram(image_full,axis=2):
     hist=hist[1:]
     hist_centers=hist_centers[1:]
 
-    #fig, axes = plt.subplots(1, 2, figsize=(8, 3))
-    #axes[0].imshow(image, cmap=plt.cm.gray, interpolation='nearest')
-    #axes[0].axis('off')
-    #axes[1].set_xlabel('channel value',fontsize=18)
-    #axes[1].set_ylabel('normalised frequency',fontsize=18)
-    #axes[1].plot(hist_centers, hist, lw=2)
-    #axes[1].set_title('histogram of gray values')
-    #fig.suptitle('Blue channel',fontsize=22)
-    return hist, hist_centers
-    
+    if plot_it:
+        fig, axes = plt.subplots(1, 2, figsize=(8, 3))
+        axes[0].imshow(image, cmap=plt.cm.gray, interpolation='nearest')
+        axes[0].axis('off')
+        axes[1].set_xlabel('channel value',fontsize=18)
+        axes[1].set_ylabel('normalised frequency',fontsize=18)
+        axes[1].plot(hist_centers, hist, lw=2)
+        axes[1].set_title('histogram of gray values')
+        fig.suptitle('Blue channel',fontsize=22)
+    else:
+        return hist, hist_centers
 
 
 def getOceanBoundary(image_full):
@@ -132,7 +142,6 @@ def getOceanBoundary(image_full):
     main_contour = sorted(contours, key = len, reverse = True)[0]
 
     coastal_edge = morphology.remove_small_objects(segmentation,10000)
-        
 
     fig, axes = plt.subplots(1, 2, figsize=(8, 3), sharey=True)
     axes[0].imshow(image, cmap=plt.cm.gray, interpolation='nearest')
@@ -147,8 +156,4 @@ def getOceanBoundary(image_full):
     plt.show()
     return coastal_edge
 
-def maskImage(image, boundary):
-    new_image = image.copy()
-    for i in range(4):
-        new_image[...,i] *= boundary
-    return new_image
+
