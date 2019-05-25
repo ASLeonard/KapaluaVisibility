@@ -17,7 +17,7 @@ from sklearn.model_selection import cross_val_score,ShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix
 
-def doAll():
+def runAnalysis():
     with open('../data/day_classes.json') as f_in:
         day_classes=json.load(f_in)
         
@@ -49,11 +49,13 @@ def doAll():
         class_.append(day_classes[ID])
     
     na = np.array(full_features)
+    
+    ##plot blue channel as example only for KMeans
     f, ax = plt.subplots()
-    
     ax.scatter(*na[...,4:].T,c=[cols[cl_] for cl_ in class_],marker='o',s=80,zorder=100)
-    
     MLAL(na,class_,ax)
+
+    ##run SVM and print out
     print('Mean accuracy {:.3f} ± {:.4f}'.format(*MLSVM(na[...,:],class_,ax)))
     
     plt.show(block=False)
@@ -94,7 +96,7 @@ def MLAL(data,classes,ax):
         norm_class=[ref_classes[i] for i in classes]
     else:
         norm_class=classes
-    print(confusion_matrix(norm_class, k_means_labels))
+    print('Confusion matrix:\n',confusion_matrix(norm_class, k_means_labels))
     
         
 def loadImage(year,month,day):
@@ -110,7 +112,7 @@ def getGreyscaleHistogram(image_full,axis=2,plot_it=False):
     image = image_full[...,axis]
     hist, hist_centers = histogram(image,normalize=1)
 
-    ##trim 0s
+    ##trim mask out, represented as 0s
     hist=hist[1:]
     hist_centers=hist_centers[1:]
 

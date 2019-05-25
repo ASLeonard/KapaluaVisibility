@@ -1,4 +1,5 @@
 # Kapalua Bay Visbility Report
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 Daily snapshots of Kapalua bay (at 10:30am local time) can be used to estimate weather the conditions in the bay are _good_ or _bad_. While this is clearly a subjective classification depending if you are a surfer or a snorkeller, it may be of some value to someone.
 
@@ -92,9 +93,10 @@ Clearly the clustering is not very effective, because the data has a lot of over
 ![clustering](figs/clusters.png)
 
 The confusion matrix was 
-| 15 | 9 |
-|---|---|
-| 4  | 2 |
+
+| 15 | 9  |
+|----|----|
+| 4  | 2  |
 
 
 **SVM** 
